@@ -11,9 +11,9 @@
 unsigned char memory[SIZE_MEMORY] = {0};
 
 // 64 x 32 Graphics buffer
-#pragma PERSISTENT(graphics)
+#pragma PERSISTENT(gfx)
 #define SIZE_GRAPHICS 2048
-unsigned char graphics[SIZE_GRAPHICS] = {0};
+unsigned char gfx[SIZE_GRAPHICS] = {0};
 
 // Game file "golden copy"
 #pragma PERSISTENT(GAME_FILE1)
@@ -73,7 +73,36 @@ unsigned char carry = 0;
 #define GET_0x0010(x) (((x) & 0x00F0) >> 4)
 #define GET_0x0001(x) (((x) & 0x000F) >> 0)
 
+#define CHAR_SIZE 5
+#define FONTSET_SIZE 80
+
+unsigned char chip8_fontset[FONTSET_SIZE] =
+{
+    0xF0, 0x90, 0x90, 0x90, 0xF0, //0
+    0x20, 0x60, 0x20, 0x20, 0x70, //1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, //2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, //3
+    0x90, 0x90, 0xF0, 0x10, 0x10, //4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, //5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, //6
+    0xF0, 0x10, 0x20, 0x40, 0x40, //7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, //8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, //9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, //A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, //B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, //C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, //D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, //E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  //F
+};
+
 static unsigned char opcode;
+
+static unsigned char draw_flag = 0;
+
+unsigned char msp430_rng(void) {
+    return opcode & 0x00FF;
+}
 
 /*
  * Clears the screen.
@@ -267,10 +296,71 @@ static inline void OP_BNNN(void) {
     PC = GET_0x0111(opcode) + REG[0];
 }
 
-static inline void OP_CXNN(void) {}
-static inline void OP_DXYN(void) {}
-static inline void OP_EX9E(void) {}
-static inline void OP_EXA1(void) {}
+/*
+ * Sets VX to the result of a bitwise-and operation on a random byte and NN.
+ */
+static inline void OP_CXNN(void) {
+    REG[GET_0x0100(opcode)] = GET_0x0011(opcode) & msp430_rng();
+    PC += 2;
+}
+
+/*
+ * Draws a sprite at (VX, VY) that was a width of 8
+ * pixels and a height of N pixels. VF is set to 1 if
+ * any screen pixels are changed from set to cleared
+ * and 0 otherwise.
+ *
+ * Each row of 8 pixels is read as bit-coded starting
+ * from memory location I. I is left unchanged.
+ */
+static inline void OP_DXYN(void) {
+    unsigned char x = REG[GET_0x0100(opcode)];
+    unsigned char y = REG[GET_0x0010(opcode)];
+    unsigned char height = GET_0x0001(opcode);
+    unsigned char pixel;
+
+    REG[0xF] = 0;
+    unsigned char yline = 0;
+    for (yline = 0; yline < height; yline++)
+    {
+        pixel = memory[I + yline];
+        unsigned char xline = 0;
+        for(xline = 0; xline < 8; xline++)
+        {
+            if((pixel & (0x80 >> xline)) != 0)
+            {
+                if(gfx[(x + xline + ((y + yline) * 64))] == 1)
+                {
+                    REG[0xF] = 1;
+                }
+                gfx[x + xline + ((y + yline) * 64)] ^= 1;
+            }
+        }
+    }
+
+    draw_flag = 1;
+    PC += 2;
+}
+
+/*
+ * Skips the next instruction if the key stored in VX is pressed.
+ */
+static inline void OP_EX9E(void) {
+    if ((keys & (REG[GET_0x0100(opcode)])) == (REG[GET_0x0100(opcode)])) {
+        PC += 2;
+    }
+    PC += 2;
+}
+
+/*
+ * Skips the next instruction if the key stores in VX isn't pressed.
+ */
+static inline void OP_EXA1(void) {
+    if ((keys & (REG[GET_0x0100(opcode)])) != (REG[GET_0x0100(opcode)])) {
+        PC += 2;
+    }
+    PC += 2;
+}
 
 /*
  * Sets VX to the value of the delay timer.
@@ -280,7 +370,24 @@ static inline void OP_FX07(void) {
     PC += 2;
 }
 
-static inline void OP_FX0A(void) {}
+/*
+ * A key press is awaited then stored in VX (blocking)
+ */
+static inline void OP_FX0A(void) {
+    unsigned char key_pressed = 0;
+    unsigned char i;
+    for (i = 0; i < 16; i++) {
+        if ((keys & (1 << i)) == (1 << i)) {
+            REG[GET_0x0100(opcode)] = (1 << i);
+            key_pressed = 1;
+        }
+    }
+
+    if (!key_pressed) {
+        return;
+    }
+    PC += 2;
+}
 
 /*
  * Sets the delay timer to VX.
@@ -290,7 +397,13 @@ static inline void OP_FX15(void) {
     PC += 2;
 }
 
-static inline void OP_FX18(void) {}
+/*
+ * Sets the sound timer to VX.
+ */
+static inline void OP_FX18(void) {
+    sound_timer = REG[GET_0x0100(opcode)];
+    PC += 2;
+}
 
 /*
  * Adds VX to I. VF is not affected.
@@ -300,7 +413,13 @@ static inline void OP_FX1E(void) {
     PC += 2;
 }
 
-static inline void OP_FX29(void) {}
+/*
+ * Sets I to the locatino of the sprite for the character in VX.
+ */
+static inline void OP_FX29(void) {
+    I = REG[GET_0x0100(opcode)] * CHAR_SIZE;
+    PC += 2;
+}
 
 /*
  * Stores the BCD representation of VX, with the MSD at I, middle digit at I+1, and LSD at I+2.
@@ -511,15 +630,26 @@ static void DelayTimerSetup(void) {
                 TBIE;           // Enable interrupts for TB1 (overflow)
 }
 
+static void CopyFontset(void) {
+    unsigned char i;
+    for (i = 0; i < 80; i++) {
+        memory[i] = chip8_fontset[i];
+    }
+}
+
+static void ClearVars() {}
+
 void Chip8Main(void) {
 
     // debug led
     P3DIR |= BIT4;
     P3OUT &= ~BIT4;
 
+    ClearVars();
     DisplaySetup();
     KeypadSetup();
     DelayTimerSetup();
+    CopyFontset();
     RequestGame();
     // while (!done_loading_game);
     // CopyGame();
