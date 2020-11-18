@@ -40,6 +40,10 @@ unsigned int PC = PROGRAM_START;
 #pragma PERSISTENT(SP)
 unsigned char SP = 0;
 
+// Pointer
+#pragma PERSISTENT(I)
+unsigned int I = 0;
+
 // Stack
 #pragma PERSISTENT(stack)
 #define SIZE_STACK 16
@@ -57,6 +61,10 @@ unsigned char sound_timer = 0;
 #pragma PERSISTENT(keys)
 unsigned int keys = 0;
 
+// Carry flag
+#pragma PERSISTENT(carry)
+unsigned char carry = 0;
+
 // Opcode bit manipulation macros
 #define GET_0x0111(x) (x & 0x0FFF)
 #define GET_0x0011(x) (x & 0x00FF)
@@ -67,8 +75,21 @@ unsigned int keys = 0;
 
 static unsigned char opcode;
 
-static inline void OP_00E0(void) {}
-static inline void OP_00EE(void) {}
+/*
+ * Clears the screen.
+ */
+static inline void OP_00E0(void) {
+    ClearScreen();
+}
+
+/*
+ * Returns from a subroutine.
+ */
+static inline void OP_00EE(void) {
+    SP--;
+    PC = stack[SP];
+    PC += 2;
+}
 
 /*
  * Jump to address NNN.
@@ -77,16 +98,51 @@ static inline void OP_1NNN(void) {
     PC = GET_0x0111(opcode);
 }
 
-static inline void OP_2NNN(void) {}
-static inline void OP_3XNN(void) {}
-static inline void OP_4XNN(void) {}
-static inline void OP_5XY0(void) {}
+/*
+ * Calls subroutine at NNN.
+ */
+static inline void OP_2NNN(void) {
+    stack[SP] = PC;
+    SP++;
+    PC = GET_0x0111(opcode);
+}
+
+/*
+ * Skips the next instruction if VX equals NN
+ */
+static inline void OP_3XNN(void) {
+    if (REG[GET_0x0100(opcode)] == GET_0x0011(opcode)) {
+        PC += 2;
+    }
+    PC += 2;
+}
+
+/*
+ * Skips the next instruction if VX doesn't equals NN
+ */
+static inline void OP_4XNN(void) {
+    if (REG[GET_0x0100(opcode)] != GET_0x0011(opcode)) {
+        PC += 2;
+    }
+    PC += 2;
+}
+
+/*
+ * Skips the next instruction if VX equals VY.
+ */
+static inline void OP_5XY0(void) {
+    if (REG[GET_0x0100(opcode)] == REG[GET_0x0010(opcode)]) {
+        PC += 2;
+    }
+    PC += 2;
+}
 
 /*
  * Sets VX to NN.
  */
 static inline void OP_6XNN(void) {
     REG[GET_0x0100(opcode)] = GET_0x0011(opcode);
+    PC += 2;
 }
 
 /*
@@ -94,6 +150,7 @@ static inline void OP_6XNN(void) {
  */
 static inline void OP_7XNN(void) {
     REG[GET_0x0100(opcode)] += GET_0x0011(opcode);
+    PC += 2;
 }
 
 /*
@@ -101,6 +158,7 @@ static inline void OP_7XNN(void) {
  */
 static inline void OP_8XY0(void) {
     REG[GET_0x0100(opcode)] = REG[GET_0x0010(opcode)];
+    PC += 2;
 }
 
 /*
@@ -108,31 +166,183 @@ static inline void OP_8XY0(void) {
  */
 static inline void OP_8XY1(void) {
     REG[GET_0x0100(opcode)] |= REG[GET_0x0010(opcode)];
+    PC += 2;
 }
 
-static inline void OP_8XY2(void) {}
-static inline void OP_8XY3(void) {}
-static inline void OP_8XY4(void) {}
-static inline void OP_8XY5(void) {}
-static inline void OP_8XY6(void) {}
-static inline void OP_8XY7(void) {}
-static inline void OP_8XYE(void) {}
-static inline void OP_9XY0(void) {}
-static inline void OP_ANNN(void) {}
-static inline void OP_BNNN(void) {}
+/*
+ * Sets VX to VX bitwise-and VY.
+ */
+static inline void OP_8XY2(void) {
+    REG[GET_0x0100(opcode)] &= REG[GET_0x0010(opcode)];
+    PC += 2;
+}
+
+/*
+ * Sets VX to VX ^ VY.
+ */
+static inline void OP_8XY3(void) {
+    REG[GET_0x0100(opcode)] ^= REG[GET_0x0010(opcode)];
+    PC += 2;
+}
+
+/*
+ *  Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
+ */
+static inline void OP_8XY4(void) {
+    if (0xFFFF - REG[GET_0x0100(opcode)] < REG[GET_0x0010(opcode)]) {
+        carry = 1;
+    } else {
+        carry = 0;
+    }
+    REG[GET_0x0100(opcode)] += REG[GET_0x0010(opcode)];
+    PC += 2;
+}
+
+/*
+ * VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+ */
+static inline void OP_8XY5(void) {
+    if (REG[GET_0x0010(opcode)] > REG[GET_0x0100(opcode)]) {
+        REG[0xF] = 0;
+    } else {
+        REG[0xF] = 1;
+    }
+    REG[GET_0x0100(opcode)] -= REG[GET_0x0010(opcode)];
+    PC += 2;
+}
+
+/*
+ * Stores the least significant bit of VX in VF and then shifts VX to the right by 1.
+ */
+static inline void OP_8XY6(void) {
+    REG[0xF] = (REG[GET_0x0100(opcode)] >> 1);
+    REG[GET_0x0100(opcode)] >>= 1;
+    PC += 2;
+}
+
+/*
+ * Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+ */
+static inline void OP_8XY7(void) {
+    if (REG[GET_0x0100(opcode)] > REG[GET_0x0010(opcode)]) {
+        REG[0xF] = 0;
+    } else {
+        REG[0xF] = 1;
+    }
+    REG[GET_0x0100(opcode)] = REG[GET_0x0010(opcode)] - REG[GET_0x0100(opcode)];
+    PC += 2;
+}
+
+/*
+ * Stores the most significant bit of VX in VF and then shifts VX to the left by 1.
+ */
+static inline void OP_8XYE(void) {
+    REG[0xF] = (REG[GET_0x0100(opcode)] << 1);
+    REG[GET_0x0100(opcode)] <<= 1;
+    PC += 2;
+}
+
+/*
+ * Skips the next instruction if VX doesn't equal VY.
+ */
+static inline void OP_9XY0(void) {
+    if (REG[GET_0x0100(opcode)] != REG[GET_0x0010(opcode)]) {
+        PC += 2;
+    }
+    PC += 2;
+}
+
+/*
+ * Sets I to address NNN.
+ */
+static inline void OP_ANNN(void) {
+    I = GET_0x0111(opcode);
+    PC += 2;
+}
+
+/*
+ * Jumps to address NNN plus V0.
+ */
+static inline void OP_BNNN(void) {
+    PC = GET_0x0111(opcode) + REG[0];
+}
+
 static inline void OP_CXNN(void) {}
 static inline void OP_DXYN(void) {}
 static inline void OP_EX9E(void) {}
 static inline void OP_EXA1(void) {}
-static inline void OP_FX07(void) {}
+
+/*
+ * Sets VX to the value of the delay timer.
+ */
+static inline void OP_FX07(void) {
+    REG[GET_0x0100(opcode)] = delay_timer;
+    PC += 2;
+}
+
 static inline void OP_FX0A(void) {}
-static inline void OP_FX15(void) {}
+
+/*
+ * Sets the delay timer to VX.
+ */
+static inline void OP_FX15(void) {
+    delay_timer = REG[GET_0x0100(opcode)];
+    PC += 2;
+}
+
 static inline void OP_FX18(void) {}
-static inline void OP_FX1E(void) {}
+
+/*
+ * Adds VX to I. VF is not affected.
+ */
+static inline void OP_FX1E(void) {
+    I += REG[GET_0x0100(opcode)];
+    PC += 2;
+}
+
 static inline void OP_FX29(void) {}
-static inline void OP_FX33(void) {}
-static inline void OP_FX55(void) {}
-static inline void OP_FX65(void) {}
+
+/*
+ * Stores the BCD representation of VX, with the MSD at I, middle digit at I+1, and LSD at I+2.
+ */
+static inline void OP_FX33(void) {
+    unsigned char x = GET_0x0100(opcode);
+    memory[I] = x / 100;
+    memory[I + 1] = (x / 10) % 10;
+    memory[I + 2] = x % 10;
+    PC += 2;
+}
+
+/*
+ * Stores V0 to VX (including VX) in memory starting at address I.
+ * The offset from I is increased by 1 for each value written, but I itself is left unmodified
+ */
+static inline void OP_FX55(void) {
+    unsigned char i;
+    for (i = 0; i < GET_0x0100(opcode); i++) {
+        memory[I + i] = REG[i];
+    }
+    PC += 2;
+}
+
+/*
+ * Fills V0 to VX (including VX) with values from memory starting at address I.
+ * The offset from I is increased by 1 for each value written, but I itself is left unmodified
+ */
+static inline void OP_FX65(void) {
+    unsigned char i;
+    for (i = 0; i < GET_0x0100(opcode); i++) {
+        REG[i] = memory[I + i];
+    }
+    PC += 2;
+}
+
+/*
+ * Invalid opcode encountered.
+ */
+static inline void OP_ERROR(void) {
+    while (1);
+}
 
 /*
  * Copy game file into CHIP-8 runtime memory.
@@ -159,6 +369,7 @@ static void ExecuteInstruction(void) {
             OP_00EE();
             break;
         default:
+            OP_ERROR();
             break;
         }
         break;
@@ -213,6 +424,7 @@ static void ExecuteInstruction(void) {
             OP_8XYE();
             break;
         default:
+            OP_ERROR();
             break;
         }
         break;
@@ -240,6 +452,7 @@ static void ExecuteInstruction(void) {
             OP_EXA1();
             break;
         default:
+            OP_ERROR();
             break;
         }
         break;
@@ -273,10 +486,12 @@ static void ExecuteInstruction(void) {
             OP_FX65();
             break;
         default:
+            OP_ERROR();
             break;
         }
         break;
     default:
+        OP_ERROR();
         break;
     }
 }
