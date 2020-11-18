@@ -3,6 +3,8 @@
 #include "uart.h"
 #include "chip8.h"
 
+volatile unsigned char done_loading_game = 0;
+
 static void UART_setup(void) {
     UCA0CTLW0 = UCSSEL0;  // Clock UCA with ACLK
     UCA0BRW = 130;  // See User's Guide (Table 18-5)
@@ -23,6 +25,9 @@ void RequestGame(void) {
 
 #pragma vector = USCI_A0_VECTOR
 __interrupt void UART_RX_INTERRUPT(void) {
+    static unsigned int state = 0;
+    static unsigned int game_file_size = 0;
+
     unsigned char rx_byte = UCA0RXBUF;
     if (rx_byte == 255 && state == 0) {
         // start byte, do nothing
@@ -45,5 +50,8 @@ __interrupt void UART_RX_INTERRUPT(void) {
         // start reading into game file memory
         GAME_FILE1[state - 3] = rx_byte;
         state++;
+        if (state >= game_file_size + 3) {
+            done_loading_game = 1;
+        }
     }
 }
