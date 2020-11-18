@@ -85,7 +85,7 @@ static void SPI_write(unsigned char data, unsigned char A0) {
     P1OUT |= BIT5;
 }
 
-static int DisplayDrawPixel(unsigned char x, unsigned char y) {
+int DisplayDrawPixel(unsigned char x, unsigned char y) {
     if (x > 131) {
         return -1;
     }
@@ -116,7 +116,7 @@ void ClearScreen(void) {
 void UpdateScreenWithGfx(void) {
     SPI_write(SET_COLUMN_ADDR_LOWER, 0);
     SPI_write(SET_COLUMN_ADDR_HIGHER, 0);
-    SPI_write(SET_PADE_ADDR, 0);
+    SPI_write(SET_PAGE_ADDR, 0);
 
     // TODO
 }

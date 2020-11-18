@@ -13,7 +13,7 @@ unsigned char memory[SIZE_MEMORY] = {0};
 // 64 x 32 Graphics buffer
 #pragma PERSISTENT(gfx)
 #define SIZE_GFX 2048
-unsigned char gfx[SIZE_GRAPHICS] = {0};
+unsigned char gfx[SIZE_GFX] = {0};
 
 // Game file "golden copy"
 #pragma PERSISTENT(GAME_FILE1)
