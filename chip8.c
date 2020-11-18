@@ -501,20 +501,19 @@ static void DebugExecuteInstruction(void) {
 }
 
 void Chip8Main(void) {
-    // debug led
-    P3DIR |= BIT4;
-    P3OUT &= ~BIT4;
+
 
     DisplaySetup();
     KeypadSetup();
     RequestGame();
-    while (!done_loading_game);
-    P3OUT |= BIT4;
-    CopyGame();
+    // while (!done_loading_game);
+    // CopyGame();
 
     while(1) {
         // ExecuteInstruction();
         DebugExecuteInstruction();
+
+        KeypadPoll();
 
         // Debug: write to screen
         /*

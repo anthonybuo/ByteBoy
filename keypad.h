@@ -3,11 +3,8 @@
 
 extern unsigned int keys;
 
-void KeypadSetup(void) {
-    keys = 1;
-}
+void KeypadSetup(void);
 
-void KeypadPoll(void) {
-}
+void KeypadPoll(void);
 
 #endif  // _KEYPAD_H_
