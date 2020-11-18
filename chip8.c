@@ -51,11 +51,11 @@ unsigned int stack[SIZE_STACK] = {0};
 
 // Delay timer (60Hz)
 #pragma PERSISTENT(delay_timer)
-unsigned char delay_timer = 0;
+volatile unsigned char delay_timer = 0;
 
 // Sound timer (60Hz)
 #pragma PERSISTENT(sound_timer)
-unsigned char sound_timer = 0;
+volatile unsigned char sound_timer = 0;
 
 // User input keypad
 #pragma PERSISTENT(keys)
@@ -500,11 +500,26 @@ static void DebugExecuteInstruction(void) {
 
 }
 
+static void DelayTimerSetup(void) {
+    /* Configure Timer B1 */
+    // CCR0
+    TB1CCR0 = 33333;  // Up mode reset value
+    // TB1 Control Register
+    TB1CTL |= TBSSEL__ACLK |  // Source TB1 with ACLK
+                MC_1 |          // Up mode (counts to TAxCCR0)
+                TBCLR |         // Clear the counter register TBR
+                TBIE;           // Enable interrupts for TB1 (overflow)
+}
+
 void Chip8Main(void) {
 
+    // debug led
+    P3DIR |= BIT4;
+    P3OUT &= ~BIT4;
 
     DisplaySetup();
     KeypadSetup();
+    DelayTimerSetup();
     RequestGame();
     // while (!done_loading_game);
     // CopyGame();
@@ -524,4 +539,30 @@ void Chip8Main(void) {
         ClearScreen();
         */
       }
+}
+
+// 60Hz Delay timer ISR
+#pragma vector = TIMER1_B1_VECTOR
+__interrupt void Timer_B1(void) {
+    static unsigned char i = 0;
+    switch(__even_in_range(TB1IV,14))
+     {
+       case  0: break;                          // No interrupt
+       case  2: break;                          // CCR1
+       case  4: break;                          // CCR2
+       case  6: break;                          // reserved
+       case  8: break;                          // reserved
+       case 10: break;                          // reserved
+       case 12: break;                          // reserved
+       case 14: // overflow
+           i++;
+           if (i > 9) {
+               i = 0;
+               if (delay_timer > 0) {
+                   delay_timer--;
+               }
+           }
+                break;
+       default: break;
+     }
 }
