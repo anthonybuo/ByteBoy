@@ -12,7 +12,7 @@ unsigned char memory[SIZE_MEMORY] = {0};
 
 // 64 x 32 Graphics buffer
 #pragma PERSISTENT(gfx)
-#define SIZE_GRAPHICS 2048
+#define SIZE_GFX 2048
 unsigned char gfx[SIZE_GRAPHICS] = {0};
 
 // Game file "golden copy"
@@ -61,10 +61,6 @@ volatile unsigned char sound_timer = 0;
 #pragma PERSISTENT(keys)
 unsigned int keys = 0;
 
-// Carry flag
-#pragma PERSISTENT(carry)
-unsigned char carry = 0;
-
 // Opcode bit manipulation macros
 #define GET_0x0111(x) (x & 0x0FFF)
 #define GET_0x0011(x) (x & 0x00FF)
@@ -108,7 +104,12 @@ unsigned char msp430_rng(void) {
  * Clears the screen.
  */
 static inline void OP_00E0(void) {
-    ClearScreen();
+    unsigned int i;
+    for (i = 0; i < SIZE_GFX; i++) {
+        gfx[i] = 0;
+    }
+    draw_flag = 1;
+    PC += 2;
 }
 
 /*
@@ -218,10 +219,10 @@ static inline void OP_8XY3(void) {
  *  Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
  */
 static inline void OP_8XY4(void) {
-    if (0xFFFF - REG[GET_0x0100(opcode)] < REG[GET_0x0010(opcode)]) {
-        carry = 1;
+    if (0xFF - REG[GET_0x0100(opcode)] < REG[GET_0x0010(opcode)]) {
+        REG[0xF] = 1;
     } else {
-        carry = 0;
+        REG[0xF] = 0;
     }
     REG[GET_0x0100(opcode)] += REG[GET_0x0010(opcode)];
     PC += 2;
@@ -244,7 +245,7 @@ static inline void OP_8XY5(void) {
  * Stores the least significant bit of VX in VF and then shifts VX to the right by 1.
  */
 static inline void OP_8XY6(void) {
-    REG[0xF] = (REG[GET_0x0100(opcode)] >> 1);
+    REG[0xF] = (REG[GET_0x0100(opcode)] & 1);
     REG[GET_0x0100(opcode)] >>= 1;
     PC += 2;
 }
@@ -266,7 +267,7 @@ static inline void OP_8XY7(void) {
  * Stores the most significant bit of VX in VF and then shifts VX to the left by 1.
  */
 static inline void OP_8XYE(void) {
-    REG[0xF] = (REG[GET_0x0100(opcode)] << 1);
+    REG[0xF] = (REG[GET_0x0100(opcode)] >> 7);
     REG[GET_0x0100(opcode)] <<= 1;
     PC += 2;
 }
@@ -414,7 +415,7 @@ static inline void OP_FX1E(void) {
 }
 
 /*
- * Sets I to the locatino of the sprite for the character in VX.
+ * Sets I to the location of the sprite for the character in VX.
  */
 static inline void OP_FX29(void) {
     I = REG[GET_0x0100(opcode)] * CHAR_SIZE;
@@ -426,9 +427,9 @@ static inline void OP_FX29(void) {
  */
 static inline void OP_FX33(void) {
     unsigned char x = GET_0x0100(opcode);
-    memory[I] = x / 100;
-    memory[I + 1] = (x / 10) % 10;
-    memory[I + 2] = x % 10;
+    memory[I] = REG[x] / 100;
+    memory[I + 1] = (REG[x] / 10) % 10;
+    memory[I + 2] = REG[x] % 10;
     PC += 2;
 }
 
@@ -474,8 +475,8 @@ static void CopyGame(void) {
  * Fetch instruction from memory and execute it.
  */
 static void ExecuteInstruction(void) {
-    // Fetch instruction
-    opcode = memory[PC];
+    // Fetch 2-byte instruction
+    opcode = (memory[PC] << 8) | memory[PC + 1];
 
     // Execute instruction
     switch (opcode & 0xF000) {
@@ -615,10 +616,6 @@ static void ExecuteInstruction(void) {
     }
 }
 
-static void DebugExecuteInstruction(void) {
-
-}
-
 static void DelayTimerSetup(void) {
     /* Configure Timer B1 */
     // CCR0
@@ -637,38 +634,42 @@ static void CopyFontset(void) {
     }
 }
 
-static void ClearVars() {}
-
 void Chip8Main(void) {
 
     // debug led
     P3DIR |= BIT4;
     P3OUT &= ~BIT4;
 
-    ClearVars();
     DisplaySetup();
     KeypadSetup();
     DelayTimerSetup();
     CopyFontset();
     RequestGame();
-    // while (!done_loading_game);
-    // CopyGame();
+    ClearScreen();
+    while (!done_loading_game) {
+        // Press A button to start with currently loaded game
+        if ((keys & (1 << 0xA)) == (1 << 0xA)) {
+            break;
+        }
+    }
+    CopyGame();
 
+    // DEBUG
+    while (1) {
+        // TODO: test drawing entire graphics buffer
+    }
+
+    // Emulation loop
     while(1) {
-        // ExecuteInstruction();
-        DebugExecuteInstruction();
+        ExecuteInstruction();
 
         KeypadPoll();
 
-        // Debug: write to screen
-        /*
-        unsigned int k;
-        for(k = 0; k < 64; k++) {
-            DisplayDrawPixel(k, k);
+        if (draw_flag) {
+            draw_flag = 0;
+            UpdateScreenWithGfx();
         }
-        ClearScreen();
-        */
-      }
+    }
 }
 
 // 60Hz Delay timer ISR

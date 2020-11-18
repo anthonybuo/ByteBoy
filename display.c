@@ -85,7 +85,7 @@ static void SPI_write(unsigned char data, unsigned char A0) {
     P1OUT |= BIT5;
 }
 
-int DisplayDrawPixel(unsigned char x, unsigned char y) {
+static int DisplayDrawPixel(unsigned char x, unsigned char y) {
     if (x > 131) {
         return -1;
     }
@@ -108,6 +108,17 @@ void ClearScreen(void) {
             SPI_write(0, 1);
         }
     }
+}
+
+/*
+ * Copies entire graphics buffer to OLED.
+ */
+void UpdateScreenWithGfx(void) {
+    SPI_write(SET_COLUMN_ADDR_LOWER, 0);
+    SPI_write(SET_COLUMN_ADDR_HIGHER, 0);
+    SPI_write(SET_PADE_ADDR, 0);
+
+    // TODO
 }
 
 void DisplaySetup(void) {

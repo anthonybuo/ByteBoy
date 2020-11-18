@@ -7,5 +7,7 @@ void ClearScreen(void);
 
 void DisplaySetup(void);
 
+void UpdateScreenWithGfx(void);
+
 #endif  // _DISPLAY_H_
 
