@@ -436,7 +436,7 @@ static inline void OP_FX33(void) {
  */
 static inline void OP_FX55(void) {
     unsigned char i;
-    for (i = 0; i < GET_0x0100(opcode); i++) {
+    for (i = 0; i <= GET_0x0100(opcode); i++) {
         memory[I + i] = REG[i];
     }
     PC += 2;
@@ -448,7 +448,7 @@ static inline void OP_FX55(void) {
  */
 static inline void OP_FX65(void) {
     unsigned char i;
-    for (i = 0; i < GET_0x0100(opcode); i++) {
+    for (i = 0; i <= GET_0x0100(opcode); i++) {
         REG[i] = memory[I + i];
     }
     PC += 2;
@@ -631,12 +631,20 @@ static void CopyFontset(void) {
     }
 }
 
+static void ClearVars(void) {
+    unsigned int i;
+    for (i = 0; i < SIZE_GFX; i++) {
+        gfx[i] = 0;
+    }
+}
+
 void Chip8Main(void) {
 
     // debug led
-    P3DIR |= BIT4;
-    P3OUT &= ~BIT4;
+    P3DIR |= (BIT4 | BIT5);
+    P3OUT &= ~(BIT4 | BIT5);
 
+    ClearVars();
     DisplaySetup();
     KeypadSetup();
     DelayTimerSetup();
@@ -654,14 +662,14 @@ void Chip8Main(void) {
 
     // Emulation loop
     while(1) {
-        ExecuteInstruction();
         P3OUT ^= BIT4;
-
+        ExecuteInstruction();
         KeypadPoll();
-
         if (draw_flag) {
             draw_flag = 0;
+            P3OUT |= BIT5;
             UpdateScreenWithGfx();
+            P3OUT &= ~BIT5;
         }
     }
 }

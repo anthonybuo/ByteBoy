@@ -2,7 +2,7 @@
 
 #include "keypad.h"
 
-#define GPIO_RISE_TIME_DELAY 200
+#define GPIO_RISE_TIME_DELAY 100
 #define NUM_COLUMNS 4
 #define NUM_ROWS 4
 

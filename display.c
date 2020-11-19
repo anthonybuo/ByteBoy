@@ -81,7 +81,7 @@ static void SPI_write(unsigned char data, unsigned char A0) {
 
     P1OUT &= ~BIT5;
     UCB0TXBUF = data;
-    _delay_cycles(1000);
+    _delay_cycles(800);
     P1OUT |= BIT5;
 }
 
