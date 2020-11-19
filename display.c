@@ -110,15 +110,40 @@ void ClearScreen(void) {
     }
 }
 
+void FillScreen(void) {
+    int y;
+    for (y = 0; y < 8; y++) {
+        SPI_write(SET_PAGE_ADDR | y, 0);
+        int x;
+        for (x = 0; x < 132; x++) {
+            SPI_write(255, 1);
+        }
+    }
+}
+
 /*
  * Copies entire graphics buffer to OLED.
  */
 void UpdateScreenWithGfx(void) {
-    SPI_write(SET_COLUMN_ADDR_LOWER, 0);
-    SPI_write(SET_COLUMN_ADDR_HIGHER, 0);
-    SPI_write(SET_PAGE_ADDR, 0);
+    unsigned char block = 0;
+    unsigned int offset = 0;
+    unsigned char i;
+    unsigned char x;
+    unsigned char y;
 
-    // TODO
+    for (y = 0; y < 4; y++) {
+        SPI_write(SET_PAGE_ADDR | y, 0);
+        SPI_write(SET_COLUMN_ADDR_LOWER | 2, 0);
+        SPI_write(SET_COLUMN_ADDR_HIGHER | 0, 0);
+        for (x = 2; x < 64; x++) {
+            for (i = 0; i < 8; i++) {
+                block |= (gfx[i * 64 + x + offset] << i);
+            }
+            SPI_write(block, 1);
+            block = 0;
+        }
+        offset += 512;
+    }
 }
 
 void DisplaySetup(void) {

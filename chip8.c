@@ -642,22 +642,19 @@ void Chip8Main(void) {
 
     DisplaySetup();
     KeypadSetup();
-    DelayTimerSetup();
+    // DelayTimerSetup();
     CopyFontset();
     RequestGame();
     ClearScreen();
     while (!done_loading_game) {
         // Press A button to start with currently loaded game
+        KeypadPoll();
         if ((keys & (1 << 0xA)) == (1 << 0xA)) {
             break;
         }
     }
+    P3OUT |= BIT4;
     CopyGame();
-
-    // DEBUG
-    while (1) {
-        // TODO: test drawing entire graphics buffer
-    }
 
     // Emulation loop
     while(1) {
