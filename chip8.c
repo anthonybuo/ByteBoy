@@ -4,6 +4,7 @@
 #include "display.h"
 #include "keypad.h"
 #include "uart.h"
+#include "rng.h"
 
 // Memory accessible to the CHIP-8 program at runtime
 #pragma PERSISTENT(memory)
@@ -92,13 +93,9 @@ unsigned char chip8_fontset[FONTSET_SIZE] =
     0xF0, 0x80, 0xF0, 0x80, 0x80  //F
 };
 
-static unsigned char opcode;
+static unsigned int opcode;
 
 static unsigned char draw_flag = 0;
-
-unsigned char msp430_rng(void) {
-    return opcode & 0x00FF;
-}
 
 /*
  * Clears the screen.
@@ -301,7 +298,7 @@ static inline void OP_BNNN(void) {
  * Sets VX to the result of a bitwise-and operation on a random byte and NN.
  */
 static inline void OP_CXNN(void) {
-    REG[GET_0x0100(opcode)] = GET_0x0011(opcode) & msp430_rng();
+    REG[GET_0x0100(opcode)] = GET_0x0011(opcode) & GenerateRandomByte();
     PC += 2;
 }
 
@@ -480,7 +477,7 @@ static void ExecuteInstruction(void) {
 
     // Execute instruction
     switch (opcode & 0xF000) {
-    case 0x0:
+    case 0x0000:
         switch (opcode & 0x00FF) {
         case 0xE0:
             OP_00E0();
@@ -493,28 +490,28 @@ static void ExecuteInstruction(void) {
             break;
         }
         break;
-    case 0x1:
+    case 0x1000:
         OP_1NNN();
         break;
-    case 0x2:
+    case 0x2000:
         OP_2NNN();
         break;
-    case 0x3:
+    case 0x3000:
         OP_3XNN();
         break;
-    case 0x4:
+    case 0x4000:
         OP_4XNN();
         break;
-    case 0x5:
+    case 0x5000:
         OP_5XY0();
         break;
-    case 0x6:
+    case 0x6000:
         OP_6XNN();
         break;
-    case 0x7:
+    case 0x7000:
         OP_7XNN();
         break;
-    case 0x8:
+    case 0x8000:
         switch (opcode & 0x000F) {
         case 0x0:
             OP_8XY0();
@@ -548,22 +545,22 @@ static void ExecuteInstruction(void) {
             break;
         }
         break;
-    case 0x9:
+    case 0x9000:
         OP_9XY0();
         break;
-    case 0xA:
+    case 0xA000:
         OP_ANNN();
         break;
-    case 0xB:
+    case 0xB000:
         OP_BNNN();
         break;
-    case 0xC:
+    case 0xC000:
         OP_CXNN();
         break;
-    case 0xD:
+    case 0xD000:
         OP_DXYN();
         break;
-    case 0xE:
+    case 0xE000:
         switch (opcode & 0x00FF) {
         case 0x9E:
             OP_EX9E();
@@ -576,7 +573,7 @@ static void ExecuteInstruction(void) {
             break;
         }
         break;
-    case 0xF:
+    case 0xF000:
         switch (opcode & 0x00FF) {
         case 0x07:
             OP_FX07();
@@ -642,7 +639,7 @@ void Chip8Main(void) {
 
     DisplaySetup();
     KeypadSetup();
-    // DelayTimerSetup();
+    DelayTimerSetup();
     CopyFontset();
     RequestGame();
     ClearScreen();
@@ -653,12 +650,12 @@ void Chip8Main(void) {
             break;
         }
     }
-    P3OUT |= BIT4;
     CopyGame();
 
     // Emulation loop
     while(1) {
         ExecuteInstruction();
+        P3OUT ^= BIT4;
 
         KeypadPoll();
 

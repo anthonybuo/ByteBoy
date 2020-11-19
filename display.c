@@ -147,7 +147,7 @@ void UpdateScreenWithGfx(void) {
 }
 
 void DisplaySetup(void) {
-    TimerB1_init();
+    // TimerB1_init();
     GPIO_init();
     SPI_init();
     // DMA_init();
