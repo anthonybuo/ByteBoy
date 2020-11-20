@@ -1,4 +1,5 @@
 #include <msp430.h>
+#include <string.h>
 
 #include "chip8.h"
 #include "display.h"
@@ -15,6 +16,11 @@ unsigned char memory[SIZE_MEMORY] = {0};
 #pragma PERSISTENT(gfx)
 #define SIZE_GFX 2048
 unsigned char gfx[SIZE_GFX] = {0};
+
+// 64 x 4 Graphics byte-update buffer
+#pragma PERSISTENT(gfx2)
+#define SIZE_GFX2 256
+unsigned char gfx2[SIZE_GFX2] = {0};
 
 // Game file "golden copy"
 #pragma PERSISTENT(GAME_FILE1)
@@ -317,6 +323,7 @@ static inline void OP_DXYN(void) {
     unsigned char height = GET_0x0001(opcode);
     unsigned char pixel;
 
+    memset(gfx2, 0, SIZE_GFX2 * sizeof(char));
     REG[0xF] = 0;
     unsigned char yline = 0;
     for (yline = 0; yline < height; yline++)
@@ -331,7 +338,10 @@ static inline void OP_DXYN(void) {
                 {
                     REG[0xF] = 1;
                 }
-                gfx[x + xline + ((y + yline) * 64)] ^= 1;
+                unsigned int idx = x + xline + ((y + yline) * 64);
+                gfx[idx] ^= 1;
+                // TODO: fix ugly gfx->gfx2 conversion
+                gfx2[(idx / 512)*64 + (idx % 0x40)] = 1;
             }
         }
     }
@@ -632,10 +642,8 @@ static void CopyFontset(void) {
 }
 
 static void ClearVars(void) {
-    unsigned int i;
-    for (i = 0; i < SIZE_GFX; i++) {
-        gfx[i] = 0;
-    }
+    memset(gfx, 0, SIZE_GFX * sizeof(unsigned char));
+    memset(gfx2, 0, SIZE_GFX2 * sizeof(unsigned char));
 }
 
 void Chip8Main(void) {

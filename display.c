@@ -125,24 +125,24 @@ void FillScreen(void) {
  * Copies entire graphics buffer to OLED.
  */
 void UpdateScreenWithGfx(void) {
-    unsigned char block = 0;
-    unsigned int offset = 0;
-    unsigned char i;
-    unsigned char x;
-    unsigned char y;
-
-    for (y = 0; y < 4; y++) {
-        SPI_write(SET_PAGE_ADDR | y, 0);
-        SPI_write(SET_COLUMN_ADDR_LOWER | 2, 0);
-        SPI_write(SET_COLUMN_ADDR_HIGHER | 0, 0);
-        for (x = 2; x < 64; x++) {
-            for (i = 0; i < 8; i++) {
-                block |= (gfx[i * 64 + x + offset] << i);
+    unsigned int i;
+    for (i = 0; i < 256; i++) {
+        if (gfx2[i] == 1) {
+            unsigned char b = 0;
+            unsigned char j;
+            for (j = 0; j < 8; j++) {
+                // TODO: fix ugly gfx2->gfx conversion
+                b |= (gfx[j * 64 + (i%0x40) + (i/64)*512] << j);
             }
-            SPI_write(block, 1);
-            block = 0;
+            unsigned int col_low = ((i % 0x40) & 0b1111);
+            unsigned int col_high = (((i % 0x40) & 0b11110000) >> 4);
+            unsigned int page = (i / 0x40);
+            SPI_write(SET_COLUMN_ADDR_LOWER | col_low, 0);
+            SPI_write(SET_COLUMN_ADDR_HIGHER | col_high, 0);
+            SPI_write(SET_PAGE_ADDR | page, 0);
+            SPI_write(b, 1);
+
         }
-        offset += 512;
     }
 }
 
