@@ -5,7 +5,6 @@
 #include "display.h"
 #include "keypad.h"
 #include "uart.h"
-#include "rng.h"
 
 // Memory accessible to the CHIP-8 program at runtime
 #pragma PERSISTENT(memory)
@@ -102,6 +101,13 @@ unsigned char chip8_fontset[FONTSET_SIZE] =
 static unsigned int opcode;
 
 static unsigned char draw_flag = 0;
+
+/*
+ * Use timer b1 for rng.
+ */
+static inline unsigned char GenerateRandomByte(void) {
+    return (TB1R & 0xFF);
+}
 
 /*
  * Clears the screen.
@@ -354,7 +360,7 @@ static inline void OP_DXYN(void) {
  * Skips the next instruction if the key stored in VX is pressed.
  */
 static inline void OP_EX9E(void) {
-    if ((keys & (REG[GET_0x0100(opcode)])) == (REG[GET_0x0100(opcode)])) {
+    if ((keys & (1 << REG[GET_0x0100(opcode)])) == (1 << REG[GET_0x0100(opcode)])) {
         PC += 2;
     }
     PC += 2;
@@ -364,7 +370,7 @@ static inline void OP_EX9E(void) {
  * Skips the next instruction if the key stores in VX isn't pressed.
  */
 static inline void OP_EXA1(void) {
-    if ((keys & (REG[GET_0x0100(opcode)])) != (REG[GET_0x0100(opcode)])) {
+    if ((keys & (1 << REG[GET_0x0100(opcode)])) != (1 << REG[GET_0x0100(opcode)])) {
         PC += 2;
     }
     PC += 2;
