@@ -98,7 +98,7 @@ unsigned char chip8_fontset[FONTSET_SIZE] =
     0xF0, 0x80, 0xF0, 0x80, 0x80  //F
 };
 
-static unsigned int opcode;
+static unsigned int opcode = 0;
 
 static unsigned char draw_flag = 0;
 
@@ -650,6 +650,16 @@ static void CopyFontset(void) {
 static void ClearVars(void) {
     memset(gfx, 0, SIZE_GFX * sizeof(unsigned char));
     memset(gfx2, 0, SIZE_GFX2 * sizeof(unsigned char));
+    memset(memory, 0, SIZE_MEMORY * sizeof(unsigned char));
+    memset(REG, 0, SIZE_REGISTERS * sizeof(unsigned char));
+    memset(stack, 0, SIZE_STACK * sizeof(unsigned char));
+
+    delay_timer = 0;
+    sound_timer = 0;
+    keys = 0;
+    PC = PROGRAM_START;
+    SP = 0;
+    I = 0;
 }
 
 void Chip8Main(void) {

@@ -40,5 +40,5 @@ P4.0 -> OLED DC
 
 P1.5 -> OLED CS
 
-VCC  -> OLED RES
+P2.5 -> OLED RES
 

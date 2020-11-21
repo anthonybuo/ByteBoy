@@ -52,6 +52,12 @@ static void GPIO_init(void) {
     /* Configure P4.0 -> DC */
     P4DIR |= BIT0;
     P4OUT &= ~BIT0;
+
+    /* Configure P2.5 -> RES */
+    P2DIR |= BIT5;
+    P2OUT &= ~BIT5;
+    _delay_cycles(1000);
+    P2OUT |= BIT5;
 }
 
 static void OLED_init(void) {
@@ -134,12 +140,21 @@ void UpdateScreenWithGfx(void) {
                 // TODO: fix ugly gfx2->gfx conversion
                 b |= (gfx[j * 64 + (i%0x40) + (i/64)*512] << j);
             }
-            unsigned int col_low = ((i % 0x40) & 0b1111);
-            unsigned int col_high = (((i % 0x40) & 0b11110000) >> 4);
+            unsigned int col = ((i*2) % 0x80) + 2;
+            unsigned int col_low = (col & 0b1111);
+            unsigned int col_high = ((col & 0b11110000) >> 4);
             unsigned int page = (i / 0x40);
             SPI_write(SET_COLUMN_ADDR_LOWER | col_low, 0);
             SPI_write(SET_COLUMN_ADDR_HIGHER | col_high, 0);
             SPI_write(SET_PAGE_ADDR | page, 0);
+            SPI_write(b, 1);
+
+            // Each gfx pixel is two actual pixels wide
+            col++;
+            col_low = (col & 0b1111);
+            col_high = ((col & 0b11110000) >> 4);
+            SPI_write(SET_COLUMN_ADDR_LOWER | col_low, 0);
+            SPI_write(SET_COLUMN_ADDR_HIGHER | col_high, 0);
             SPI_write(b, 1);
 
         }
