@@ -6,7 +6,13 @@ is read through a 4x4 matrix keypad and a VMA437 OLED display is used to
 display graphics using SPI.
 
 ## Images
-todo
+System Internals
+
+![](https://github.com/anthonybuo/ByteBoy/blob/main/internals.jpg?raw=true)
+
+Packaged System
+
+![](https://github.com/anthonybuo/ByteBoy/blob/main/packaged.PNG?raw=true)
 
 ## Pinout
 
